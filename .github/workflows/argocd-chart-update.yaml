@@ -77,7 +77,7 @@ jobs:
         run: |
           task build-cli
           task yokecd-installer
-          yoke takeoff argocd ./argocd.wasm
+          ./yoke takeoff argocd ./yokecd-installer.wasm
 
       # - name: Create PR
       #   if: steps.diff.outputs.pr == 'true'
