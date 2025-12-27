@@ -4,8 +4,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 on:
-  schedule:
-    - cron: "0 0 * * 1" # 00:00 on Mondays
+  pull_request:
+    branches:
+      - main
+  # schedule:
+  #   - cron: "0 0 * * 1" # 00:00 on Mondays
 
 jobs:
   update-embedded-argocd:
@@ -20,8 +23,11 @@ jobs:
         with:
           fetch-depth: 1
           sparse-checkout: |
-            cmd/yokecd-installer/argocd
+            cmd
+            go.mod
+            go.sum
 
+      # Does this make sense? Or use taskfile?
       - name: Check for new ArgoCD Chart version
         id: diff
         shell: bash
@@ -41,39 +47,59 @@ jobs:
             CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
             echo "new version detected (${CHART_VERSION}), opening PR..."
             echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+            echo "continue=true" >> "$GITHUB_OUTPUT"
           else
             echo "ArgoCD Chart is up to date, no action needed, exiting..."
           fi
 
-      - name: Create PR
-        if: steps.diff.outputs.version != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/setup-go@v6
+        if: steps.diff.outputs.continue == 'true'
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup k3d
+        if: steps.diff.outputs.continue == 'true'
         run: |
-          set -euo pipefail
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d cluster create ci --wait
 
-          BRANCH="yokecd-installer/argocd-chart-upgrade"
-          TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+      - name: Deploy ArgoCD
+        if: steps.diff.outputs.proceed == 'true'
+        run: |
+          GOOS=wasip1 GOARCH=wasm go build -o argocd.wasm ./cmd/yokecd-installer/main.go
+          go build ./cmd/yoke
+          yoke takeoff argocd ./argocd.wasm
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add .
-          git commit -m "$TITLE"
-          git push origin "$BRANCH" --force
-
-          PR_STATE="$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null || echo "NONE")"
-
-          if [[ "$PR_STATE" == "OPEN" ]]; then
-            echo "PR already open for $BRANCH, exiting..."
-          else
-            echo "No open PR found, creating PR..."
-            gh pr create \
-              --title "$TITLE" \
-              --body "Automated update of embedded ArgoCD Helm Chart." \
-              --base main \
-              --head "$BRANCH"
-
-            # TODO: Identify upstream branch protection rules and implement accordingly
-            gh pr merge "$BRANCH" --auto --merge
-          fi
+      # - name: Create PR
+      #   if: steps.diff.outputs.pr == 'true'
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
+      #   run: |
+      #     set -euo pipefail
+      #
+      #     BRANCH="yokecd-installer/argocd-chart-upgrade"
+      #     TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+      #
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git checkout -b "$BRANCH"
+      #     git add .
+      #     git commit -m "$TITLE"
+      #     git push origin "$BRANCH" --force
+      #
+      #     PR_STATE="$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null || echo "NONE")"
+      #
+      #     if [[ "$PR_STATE" == "OPEN" ]]; then
+      #       echo "PR already open for $BRANCH, exiting..."
+      #     else
+      #       echo "No open PR found, creating PR..."
+      #       gh pr create \
+      #         --title "$TITLE" \
+      #         --body "Automated update of embedded ArgoCD Helm Chart." \
+      #         --base main \
+      #         --head "$BRANCH"
+      #
+      #       # TODO: Identify upstream branch protection rules and implement accordingly
+      #       gh pr merge "$BRANCH" --auto --merge
+      #     fi
