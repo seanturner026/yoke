@@ -33,6 +33,13 @@ jobs:
       - name: Setup Taskfile
         uses: go-task/setup-task@v1
 
+      - uses: actions/setup-go@v6
+        if: steps.diff.outputs.continue == 'true'
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: "go.sum"
+
       - name: Check for new ArgoCD Chart version
         id: diff
         shell: bash
@@ -60,12 +67,6 @@ jobs:
           else
             echo "ArgoCD Chart is up to date, no action needed, exiting..."
           fi
-
-      - uses: actions/setup-go@v6
-        if: steps.diff.outputs.continue == 'true'
-        with:
-          go-version-file: go.mod
-          cache: true
 
       - name: Setup k3d
         if: steps.diff.outputs.continue == 'true'
