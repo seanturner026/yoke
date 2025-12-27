@@ -34,7 +34,6 @@ jobs:
         uses: go-task/setup-task@v1
 
       - uses: actions/setup-go@v6
-        if: steps.diff.outputs.continue == 'true'
         with:
           go-version-file: go.mod
           cache: true
@@ -42,7 +41,6 @@ jobs:
 
       - name: Check for new ArgoCD Chart version
         id: diff
-        shell: bash
         run: |
           set -euo pipefail
 
