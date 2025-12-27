@@ -30,9 +30,6 @@ jobs:
             pkg
             Taskfile.yml
 
-      - name: Setup Taskfile
-        uses: go-task/setup-task@v1
-
       - name: Check for new ArgoCD Chart version
         id: diff
         run: |
@@ -71,6 +68,14 @@ jobs:
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d cluster create ci --wait
 
+      - name: Setup Taskfile
+        if: steps.diff.outputs.continue == 'true'
+        uses: go-task/setup-task@v1
+
+      - name: Setup Kubectl
+        if: steps.diff.outputs.continue == 'true'
+        uses: azure/setup-kubectl@v4
+
       - name: Deploy ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
@@ -78,8 +83,17 @@ jobs:
           task yokecd-installer
           ./yoke takeoff argocd ./yokecd-installer.wasm -wait 500
 
+      - name: Validate ArgoCD
+        if: steps.diff.outputs.continue == 'true'
+        run: |
+          kubectl wait \
+            --for=condition=Available \
+            deployment \
+            --all \
+            --timeout=5m
+
       - name: Create PR
-        if: steps.diff.outputs.pr == 'true'
+        if: steps.diff.outputs.continue == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
