@@ -33,38 +33,38 @@ jobs:
       - name: Setup Taskfile
         uses: go-task/setup-task@v1
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-          cache-dependency-path: "go.sum"
-
       - name: Check for new ArgoCD Chart version
         id: diff
         run: |
           set -euo pipefail
 
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-          task update-yokecd-argo
+          # echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          # task update-yokecd-argo
 
-          # cd cmd/yokecd-installer/argocd
-          # rm -f argo-cd-*.tgz
-          #
-          # # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
-          # CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
-          # CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
-          # CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
-          # curl -fsSLO "$CHART_URL"
+          cd cmd/yokecd-installer/argocd
+          rm -f argo-cd-*.tgz
+
+          # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
+          CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
+          CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
+          CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
+          curl -fsSLO "$CHART_URL"
 
           if ! git diff --quiet; then
-            # CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
-            # echo "new version detected (${CHART_VERSION}), opening PR..."
+            CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
+            echo "new version detected (${CHART_VERSION}), opening PR..."
             echo "new version detected, opening PR..."
-            # echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+            echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
             echo "continue=true" >> "$GITHUB_OUTPUT"
           else
             echo "ArgoCD Chart is up to date, no action needed, exiting..."
           fi
+
+      - uses: actions/setup-go@v6
+        if: steps.diff.outputs.continue == 'true'
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Setup k3d
         if: steps.diff.outputs.continue == 'true'
