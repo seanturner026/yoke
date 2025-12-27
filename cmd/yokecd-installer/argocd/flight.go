@@ -37,7 +37,7 @@ func loadEmbeddedChart() (string, []byte, error) {
 func RenderChart(release, namespace string, values map[string]any) ([]*unstructured.Unstructured, error) {
 	_, archive, err := loadEmbeddedChart()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to identify zipped archive: %w", err)
 	}
 	chart, err := helm.LoadChartFromZippedArchive(archive)
 	if err != nil {

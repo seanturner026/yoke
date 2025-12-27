@@ -82,9 +82,9 @@ jobs:
       - name: Deploy ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
-          go install github.com/yokecd/yoke/cmd/yoke@latest
+          task build-cli
           task yokecd-installer
-          ./yoke takeoff argocd ./yokecd-installer.wasm -wait 500
+          ./yoke takeoff argocd ./yokecd-installer.wasm
 
       - name: Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
