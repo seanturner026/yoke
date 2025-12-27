@@ -60,7 +60,6 @@ jobs:
         if: steps.diff.outputs.continue == 'true'
         with:
           go-version-file: go.mod
-          cache: true
 
       - name: Setup k3d
         if: steps.diff.outputs.continue == 'true'
