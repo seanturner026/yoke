@@ -53,7 +53,6 @@ jobs:
           if ! git diff --quiet; then
             CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
             echo "new version detected (${CHART_VERSION}), opening PR..."
-            echo "new version detected, opening PR..."
             echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
             echo "continue=true" >> "$GITHUB_OUTPUT"
           else
@@ -77,37 +76,37 @@ jobs:
         run: |
           task build-cli
           task yokecd-installer
-          ./yoke takeoff argocd ./yokecd-installer.wasm
+          ./yoke takeoff argocd ./yokecd-installer.wasm -wait 500
 
-      # - name: Create PR
-      #   if: steps.diff.outputs.pr == 'true'
-      #   env:
-      #     GH_TOKEN: ${{ github.token }}
-      #   run: |
-      #     set -euo pipefail
-      #
-      #     BRANCH="yokecd-installer/argocd-chart-upgrade"
-      #     TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
-      #
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
-      #     git checkout -b "$BRANCH"
-      #     git add .
-      #     git commit -m "$TITLE"
-      #     git push origin "$BRANCH" --force
-      #
-      #     PR_STATE="$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null || echo "NONE")"
-      #
-      #     if [[ "$PR_STATE" == "OPEN" ]]; then
-      #       echo "PR already open for $BRANCH, exiting..."
-      #     else
-      #       echo "No open PR found, creating PR..."
-      #       gh pr create \
-      #         --title "$TITLE" \
-      #         --body "Automated update of embedded ArgoCD Helm Chart." \
-      #         --base main \
-      #         --head "$BRANCH"
-      #
-      #       # TODO: Identify upstream branch protection rules and implement accordingly
-      #       gh pr merge "$BRANCH" --auto --merge
-      #     fi
+      - name: Create PR
+        if: steps.diff.outputs.pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="yokecd-installer/argocd-chart-upgrade"
+          TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add .
+          git commit -m "$TITLE"
+          git push origin "$BRANCH" --force
+
+          PR_STATE="$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null || echo "NONE")"
+
+          if [[ "$PR_STATE" == "OPEN" ]]; then
+            echo "PR already open for $BRANCH, exiting..."
+          else
+            echo "No open PR found, creating PR..."
+            # gh pr create \
+            #   --title "$TITLE" \
+            #   --body "Automated update of embedded ArgoCD Helm Chart." \
+            #   --base main \
+            #   --head "$BRANCH"
+            #
+            # # TODO: Identify upstream branch protection rules and implement accordingly
+            # gh pr merge "$BRANCH" --auto --merge
+          fi
