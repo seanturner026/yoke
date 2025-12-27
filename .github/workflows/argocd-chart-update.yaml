@@ -26,27 +26,33 @@ jobs:
             cmd
             go.mod
             go.sum
+            Taskfile.yml
 
-      # Does this make sense? Or use taskfile?
+      - name: Setup Taskfile
+        run: curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.rpm.sh' | sudo -E bash
+
       - name: Check for new ArgoCD Chart version
         id: diff
         shell: bash
         run: |
           set -euo pipefail
 
-          cd cmd/yokecd-installer/argocd
-          rm -f argo-cd-*.tgz
+          task update-yokecd-argo
 
-          # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
-          CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
-          CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
-          CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
-          curl -fsSLO "$CHART_URL"
+          # cd cmd/yokecd-installer/argocd
+          # rm -f argo-cd-*.tgz
+          #
+          # # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
+          # CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
+          # CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
+          # CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
+          # curl -fsSLO "$CHART_URL"
 
           if ! git diff --quiet; then
-            CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
-            echo "new version detected (${CHART_VERSION}), opening PR..."
-            echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+            # CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
+            # echo "new version detected (${CHART_VERSION}), opening PR..."
+            echo "new version detected, opening PR..."
+            # echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
             echo "continue=true" >> "$GITHUB_OUTPUT"
           else
             echo "ArgoCD Chart is up to date, no action needed, exiting..."
@@ -65,10 +71,10 @@ jobs:
           k3d cluster create ci --wait
 
       - name: Deploy ArgoCD
-        if: steps.diff.outputs.proceed == 'true'
+        if: steps.diff.outputs.continue == 'true'
         run: |
-          GOOS=wasip1 GOARCH=wasm go build -o argocd.wasm ./cmd/yokecd-installer/main.go
-          go build ./cmd/yoke
+          task build-cli
+          task yokecd-installer
           yoke takeoff argocd ./argocd.wasm
 
       # - name: Create PR
