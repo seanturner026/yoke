@@ -76,6 +76,10 @@ jobs:
         if: steps.diff.outputs.continue == 'true'
         uses: azure/setup-kubectl@v4
 
+      - name: Download Go modules
+        if: steps.diff.outputs.continue == 'true'
+        run: go mod download
+
       - name: Deploy ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
