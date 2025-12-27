@@ -39,6 +39,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           task update-yokecd-argo
 
           # cd cmd/yokecd-installer/argocd
