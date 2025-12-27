@@ -29,7 +29,7 @@ jobs:
             Taskfile.yml
 
       - name: Setup Taskfile
-        run: curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.rpm.sh' | sudo -E bash
+        uses: go-task/setup-task@v1
 
       - name: Check for new ArgoCD Chart version
         id: diff
