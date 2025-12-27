@@ -4,11 +4,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 on:
-  pull_request:
-    branches:
-      - main
-  # schedule:
-  #   - cron: "0 0 * * 1" # 00:00 on Mondays
+  schedule:
+    - cron: "0 0 * * 1" # 00:00 on Mondays
 
 jobs:
   update-embedded-argocd:
@@ -115,12 +112,12 @@ jobs:
             echo "PR already open for $BRANCH, exiting..."
           else
             echo "No open PR found, creating PR..."
-            # gh pr create \
-            #   --title "$TITLE" \
-            #   --body "Automated update of embedded ArgoCD Helm Chart." \
-            #   --base main \
-            #   --head "$BRANCH"
-            #
+            gh pr create \
+              --title "$TITLE" \
+              --body "Automated update of embedded ArgoCD Helm Chart." \
+              --base main \
+              --head "$BRANCH"
+
             # # TODO: Identify upstream branch protection rules and implement accordingly
             # gh pr merge "$BRANCH" --auto --merge
           fi
