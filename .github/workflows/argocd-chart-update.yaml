@@ -26,6 +26,8 @@ jobs:
             cmd
             go.mod
             go.sum
+            internal
+            pkg
             Taskfile.yml
 
       - name: Setup Taskfile
