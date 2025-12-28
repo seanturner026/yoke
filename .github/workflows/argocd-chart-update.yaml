@@ -1,0 +1,126 @@
+name: argocd chart update
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 00:00 on Mondays
+  workflow_dispatch:
+
+jobs:
+  update-embedded-argocd:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            cmd
+            go.mod
+            go.sum
+            internal
+            pkg
+            Taskfile.yml
+
+      - name: Check for new ArgoCD Chart version
+        id: diff
+        run: |
+          set -euo pipefail
+
+          cd cmd/yokecd-installer/argocd
+          rm -f argo-cd-*.tgz
+
+          # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
+          CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
+          CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
+          CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
+          curl -fsSLO "$CHART_URL"
+
+          if ! git diff --quiet; then
+            CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
+            echo "new version detected (${CHART_VERSION}), opening PR..."
+            echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+            echo "continue=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ArgoCD Chart is up to date, no action needed, exiting..."
+          fi
+
+      - uses: actions/setup-go@v6
+        if: steps.diff.outputs.continue == 'true'
+        with:
+          go-version-file: go.mod
+
+      - name: Setup k3d
+        if: steps.diff.outputs.continue == 'true'
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d cluster create ci --wait
+
+      - name: Setup Taskfile
+        if: steps.diff.outputs.continue == 'true'
+        uses: go-task/setup-task@v1
+
+      - name: Setup Kubectl
+        if: steps.diff.outputs.continue == 'true'
+        uses: azure/setup-kubectl@v4
+
+      - name: Download Go modules
+        if: steps.diff.outputs.continue == 'true'
+        run: go mod download
+
+      - name: Deploy ArgoCD
+        if: steps.diff.outputs.continue == 'true'
+        run: |
+          kubectl create namespace argocd
+          kubectl config set-context --current --namespace argocd
+          task build-cli
+          task yokecd-installer
+          ./yoke takeoff argocd ./yokecd-installer.wasm
+
+      - name: Validate ArgoCD
+        if: steps.diff.outputs.continue == 'true'
+        run: |
+          kubectl wait \
+          --for=condition=Available \
+          deployment \
+          --all \
+          --timeout=5m
+
+      - name: Create PR
+        if: steps.diff.outputs.continue == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="yokecd-installer/argocd-chart-upgrade"
+          TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add cmd/yokecd-installer/*.tgz
+          git commit -m "$TITLE"
+          git push origin "$BRANCH" --force
+
+          PR_STATE="$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null || echo "NONE")"
+
+          if [[ "$PR_STATE" == "OPEN" ]]; then
+            echo "PR already open for $BRANCH, exiting..."
+          else
+            echo "No open PR found, creating PR..."
+            gh pr create \
+              --title "$TITLE" \
+              --body "Automated update of embedded ArgoCD Helm Chart." \
+              --base main \
+              --head "$BRANCH"
+
+            # # TODO: Identify upstream branch protection rules and implement accordingly
+            # gh pr merge "$BRANCH" --auto --merge
+          fi
