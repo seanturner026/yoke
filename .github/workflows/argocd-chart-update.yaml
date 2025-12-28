@@ -6,6 +6,7 @@ concurrency:
 on:
   schedule:
     - cron: "0 0 * * 1" # 00:00 on Mondays
+  workflow_dispatch:
 
 jobs:
   update-embedded-argocd:
