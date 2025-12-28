@@ -76,18 +76,19 @@ jobs:
       - name: Deploy ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
+          kubectl create namespace argocd
+          kubectl config set-context --current --namespace argocd
           task build-cli
           task yokecd-installer
           ./yoke takeoff argocd ./yokecd-installer.wasm
 
       - name: Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
-        run: |
-          kubectl wait \
-            --for=condition=Available \
-            deployment \
-            --all \
-            --timeout=5m
+        run: kubectl wait \
+          --for=condition=Available \
+          deployment \
+          --all \
+          --timeout=5m
 
       - name: Create PR
         if: steps.diff.outputs.continue == 'true'
