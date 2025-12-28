@@ -85,7 +85,8 @@ jobs:
 
       - name: Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
-        run: kubectl wait \
+        run: |
+          kubectl wait \
           --for=condition=Available \
           deployment \
           --all \
