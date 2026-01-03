@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -121,7 +122,7 @@ func run() error {
 			}
 		} else {
 			if len(chart.Schema) == 0 {
-				debug("no schema found within chart")
+				return errors.New("no schema found")
 			}
 		}
 
