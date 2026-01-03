@@ -73,6 +73,9 @@ func run() error {
 	if err := ensureGoJsonSchema(ctx); err != nil {
 		return fmt.Errorf("failed to ensure go-jsonschema installation: %w", err)
 	}
+	if err := ensureGoimports(ctx); err != nil {
+		return fmt.Errorf("failed to ensure goimports installation: %w", err)
+	}
 
 	packageName := regexp.MustCompile(`\W`).ReplaceAllString(filepath.Base(*outDir), "")
 	*outDir, _ = filepath.Abs(*outDir)
@@ -189,6 +192,13 @@ func ensureReadmeGenerator(ctx context.Context) error {
 func ensureGoJsonSchema(ctx context.Context) error {
 	if err := x(exec.CommandContext(ctx, "go", "install", "github.com/atombender/go-jsonschema@latest")); err != nil {
 		return fmt.Errorf("failed to install go-jsonschema: %w", err)
+	}
+	return nil
+}
+
+func ensureGoimports(ctx context.Context) error {
+	if err := x(exec.CommandContext(ctx, "go", "get", "golang.org/x/tools/cmd/goimports")); err != nil {
+		return fmt.Errorf("failed to install goimports : %w", err)
 	}
 	return nil
 }
