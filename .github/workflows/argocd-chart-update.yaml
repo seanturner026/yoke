@@ -5,7 +5,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # 00:00 on Mondays
+    - cron: "0 0 1,16 * *" # 00:00 on day 1 and 16 of each month
   workflow_dispatch:
 
 jobs:
@@ -28,33 +28,29 @@ jobs:
             pkg
             Taskfile.yml
 
-      - name: Check for new ArgoCD Chart version
-        id: diff
-        run: |
-          set -euo pipefail
-
-          cd cmd/yokecd-installer/argocd
-          rm -f argo-cd-*.tgz
-
-          # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
-          CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
-          CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
-          CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
-          curl -fsSLO "$CHART_URL"
-
-          if ! git diff --quiet; then
-            CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
-            echo "new version detected (${CHART_VERSION}), opening PR..."
-            echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
-            echo "continue=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ArgoCD Chart is up to date, no action needed, exiting..."
-          fi
+      - name: Setup Taskfile
+        if: steps.diff.outputs.continue == 'true'
+        uses: go-task/setup-task@v1
 
       - uses: actions/setup-go@v6
         if: steps.diff.outputs.continue == 'true'
         with:
           go-version-file: go.mod
+
+      - name: Download Go modules
+        if: steps.diff.outputs.continue == 'true'
+        run: go mod download
+
+      - name: Check for new ArgoCD Chart version
+        id: diff
+        run: |
+          task update-yokecd-argo
+          if ! git diff --quiet; then
+            echo "new version detected, opening PR..."
+            echo "continue=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ArgoCD Chart is up to date, no action needed, exiting..."
+          fi
 
       - name: Setup k3d
         if: steps.diff.outputs.continue == 'true'
@@ -62,35 +58,18 @@ jobs:
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d cluster create ci --wait
 
-      - name: Setup Taskfile
-        if: steps.diff.outputs.continue == 'true'
-        uses: go-task/setup-task@v1
-
       - name: Setup Kubectl
         if: steps.diff.outputs.continue == 'true'
         uses: azure/setup-kubectl@v4
 
-      - name: Download Go modules
-        if: steps.diff.outputs.continue == 'true'
-        run: go mod download
-
-      - name: Deploy ArgoCD
+      - name: Deploy and Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
           kubectl create namespace argocd
           kubectl config set-context --current --namespace argocd
           task build-cli
           task yokecd-installer
-          ./yoke takeoff argocd ./yokecd-installer.wasm
-
-      - name: Validate ArgoCD
-        if: steps.diff.outputs.continue == 'true'
-        run: |
-          kubectl wait \
-          --for=condition=Available \
-          deployment \
-          --all \
-          --timeout=5m
+          ./yoke takeoff -wait 10m argocd ./yokecd-installer.wasm
 
       - name: Create PR
         if: steps.diff.outputs.continue == 'true'
@@ -100,7 +79,7 @@ jobs:
           set -euo pipefail
 
           BRANCH="yokecd-installer/argocd-chart-upgrade"
-          TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+          TITLE="yokecd-installer: bump ArgoCD Chart to latest"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -120,7 +99,4 @@ jobs:
               --body "Automated update of embedded ArgoCD Helm Chart." \
               --base main \
               --head "$BRANCH"
-
-            # # TODO: Identify upstream branch protection rules and implement accordingly
-            # gh pr merge "$BRANCH" --auto --merge
           fi
