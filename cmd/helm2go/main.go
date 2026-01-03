@@ -192,7 +192,7 @@ func ensureReadmeGenerator(ctx context.Context) error {
 	return nil
 }
 
-func ensureGoLibrary(ctx context.Context, libraryName string, libraryURI string) error {
+func ensureGoLibrary(ctx context.Context, libraryName, libraryURI string) error {
 	if err := x(exec.CommandContext(ctx, "go", "install", libraryURI)); err != nil {
 		return fmt.Errorf("failed to install %s: %w", libraryName, err)
 	}
