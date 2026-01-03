@@ -5,7 +5,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # 00:00 on Mondays
+    - cron: "0 0 1,16 * *" # 00:00 on day 1 and 16 of each month
   workflow_dispatch:
 
 jobs:
@@ -111,7 +111,4 @@ jobs:
               --body "Automated update of embedded ArgoCD Helm Chart." \
               --base main \
               --head "$BRANCH"
-
-            # # TODO: Identify upstream branch protection rules and implement accordingly
-            # gh pr merge "$BRANCH" --auto --merge
           fi
