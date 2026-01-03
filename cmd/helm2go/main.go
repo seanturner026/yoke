@@ -197,7 +197,7 @@ func ensureGoJsonSchema(ctx context.Context) error {
 }
 
 func ensureGoimports(ctx context.Context) error {
-	if err := x(exec.CommandContext(ctx, "go", "get", "golang.org/x/tools/cmd/goimports")); err != nil {
+	if err := x(exec.CommandContext(ctx, "go", "install", "golang.org/x/tools/cmd/goimports@latest")); err != nil {
 		return fmt.Errorf("failed to install goimports : %w", err)
 	}
 	return nil
