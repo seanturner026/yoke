@@ -74,23 +74,14 @@ jobs:
         if: steps.diff.outputs.continue == 'true'
         run: go mod download
 
-      - name: Deploy ArgoCD
+      - name: Deploy and Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
           kubectl create namespace argocd
           kubectl config set-context --current --namespace argocd
           task build-cli
           task yokecd-installer
-          ./yoke takeoff argocd ./yokecd-installer.wasm
-
-      - name: Validate ArgoCD
-        if: steps.diff.outputs.continue == 'true'
-        run: |
-          kubectl wait \
-          --for=condition=Available \
-          deployment \
-          --all \
-          --timeout=5m
+          ./yoke takeoff -wait 10m argocd ./yokecd-installer.wasm
 
       - name: Create PR
         if: steps.diff.outputs.continue == 'true'
