@@ -28,33 +28,26 @@ jobs:
             pkg
             Taskfile.yml
 
+      - name: Setup Taskfile
+        uses: go-task/setup-task@v1
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Download Go modules
+        run: go mod download
+
       - name: Check for new ArgoCD Chart version
         id: diff
         run: |
-          set -euo pipefail
-
-          cd cmd/yokecd-installer/argocd
-          rm -f argo-cd-*.tgz
-
-          # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/Chart.yaml
-          CHART_INDEX_URL="https://argoproj.github.io/argo-helm/index.yaml"
-          CHART_ENTRY="$(curl -fsSL "$CHART_INDEX_URL" | yq '.entries."argo-cd"[0]')"
-          CHART_URL="$(echo "$CHART_ENTRY" | yq -r '.urls[0]')"
-          curl -fsSLO "$CHART_URL"
-
+          task update-yokecd-argo
           if ! git diff --quiet; then
-            CHART_VERSION="$(echo "$CHART_ENTRY" | yq -r '.version')"
-            echo "new version detected (${CHART_VERSION}), opening PR..."
-            echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+            echo "new version detected, opening PR..."
             echo "continue=true" >> "$GITHUB_OUTPUT"
           else
             echo "ArgoCD Chart is up to date, no action needed, exiting..."
           fi
-
-      - uses: actions/setup-go@v6
-        if: steps.diff.outputs.continue == 'true'
-        with:
-          go-version-file: go.mod
 
       - name: Setup k3d
         if: steps.diff.outputs.continue == 'true'
@@ -62,17 +55,9 @@ jobs:
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d cluster create ci --wait
 
-      - name: Setup Taskfile
-        if: steps.diff.outputs.continue == 'true'
-        uses: go-task/setup-task@v1
-
       - name: Setup Kubectl
         if: steps.diff.outputs.continue == 'true'
         uses: azure/setup-kubectl@v4
-
-      - name: Download Go modules
-        if: steps.diff.outputs.continue == 'true'
-        run: go mod download
 
       - name: Deploy and Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
@@ -91,7 +76,7 @@ jobs:
           set -euo pipefail
 
           BRANCH="yokecd-installer/argocd-chart-upgrade"
-          TITLE="yokecd-installer: bump ArgoCD Chart to ${{ steps.diff.outputs.version }}"
+          TITLE="yokecd-installer: bump ArgoCD Chart to latest"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
