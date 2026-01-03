@@ -29,16 +29,13 @@ jobs:
             Taskfile.yml
 
       - name: Setup Taskfile
-        if: steps.diff.outputs.continue == 'true'
         uses: go-task/setup-task@v1
 
       - uses: actions/setup-go@v6
-        if: steps.diff.outputs.continue == 'true'
         with:
           go-version-file: go.mod
 
       - name: Download Go modules
-        if: steps.diff.outputs.continue == 'true'
         run: go mod download
 
       - name: Check for new ArgoCD Chart version
