@@ -55,18 +55,12 @@ jobs:
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d cluster create ci --wait
 
-      - name: Setup Kubectl
-        if: steps.diff.outputs.continue == 'true'
-        uses: azure/setup-kubectl@v4
-
       - name: Deploy and Validate ArgoCD
         if: steps.diff.outputs.continue == 'true'
         run: |
-          kubectl create namespace argocd
-          kubectl config set-context --current --namespace argocd
           task build-cli
           task yokecd-installer
-          ./yoke takeoff -wait 10m argocd ./yokecd-installer.wasm
+          ./yoke takeoff -create-namespace -namespace argocd -wait 10m argocd ./yokecd-installer.wasm
 
       - name: Create PR
         if: steps.diff.outputs.continue == 'true'
